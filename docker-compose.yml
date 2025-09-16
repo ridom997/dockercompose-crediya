@@ -65,6 +65,8 @@ services:
       ADAPTER_RESTCONSUMER_URL: "http://authentication-ms-credi-ya:8080"
       SECURITY_JWT_SECRET: "dev-very-long-secret-change-me-please-0123456789"
       AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ...
+      AWS_SECRET_ACCESS_KEY: ...
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,4 +79,5 @@ services:
 
 networks:
   crediya-net:
+
     driver: bridge
