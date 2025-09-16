@@ -1,0 +1,80 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgresql
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      # Deja la DB por defecto; las reales se crean vía scripts en ./POSTGRES/init
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./POSTGRES/pgdata:/var/lib/postgresql/data
+      - ./POSTGRES/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Chequeo genérico del servidor (no ata a una DB específica)
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - crediya-net
+
+  authentication-ms-credi-ya:
+    build:
+      context: ./authentication-microservice-credi-ya-pedro-rios
+      dockerfile: deployment/Dockerfile
+    image: crediya-auth-service:local
+    container_name: authentication-ms-credi-ya
+    environment:
+      SERVER_PORT: "8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      # <<< BASE DE DATOS DE AUTENTICACIÓN >>>
+      DB_NAME_LOAN: autenticacion_crediya_db
+      DB_SCHEMA: public
+      DB_USERNAME: admin
+      DB_PASSWORD: admin123
+      SECURITY_JWT_SECRET: "dev-very-long-secret-change-me-please-0123456789"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks:
+      - crediya-net
+
+  crediya-request-service:
+    build:
+      context: ./requests-microservice-credi-ya-pedro-rios
+      dockerfile: deployment/Dockerfile
+    image: crediya-request-service:local
+    container_name: crediya-request-service
+    environment:
+      SERVER_PORT: "8081"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      # <<< BASE DE DATOS DE SOLICITUDES >>>
+      DB_NAME_LOAN: solicitudes_crediya_db
+      DB_SCHEMA: public
+      DB_USERNAME: admin
+      DB_PASSWORD: admin123
+      ADAPTER_RESTCONSUMER_URL: "http://authentication-ms-credi-ya:8080"
+      SECURITY_JWT_SECRET: "dev-very-long-secret-change-me-please-0123456789"
+      AWS_REGION: us-east-1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      authentication-ms-credi-ya:
+        condition: service_started
+    ports:
+      - "8081:8081"
+    networks:
+      - crediya-net
+
+networks:
+  crediya-net:
+    driver: bridge
